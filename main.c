@@ -1,6 +1,7 @@
 #define BUFSIZE 128
 #define DEBUG 1
 
+#include <errno.h>
 #include <libgen.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -18,84 +19,7 @@
                     ##__VA_ARGS__);                                                                \
     } while (0)
 
-void put(const char *str)
-{
-    while (*str) putchar(*str++);
-}
-
-size_t slen(const char *str)
-{
-    size_t len = 0;
-    for (; str[len]; ++len)
-        ;
-    return len;
-}
-
-char *_strdup(const char *str)
-{
-    size_t len = strlen(str) + 1;
-    char *p = malloc(len);
-    return p ? memcpy(p, str, len) : NULL;
-}
-
-char *ft_strdup(const char *str) { return strcpy(malloc(strlen(str) + 1), str); }
-
-int parse_output(const char *cmd)
-{
-    char buf[BUFSIZE];
-    FILE *fp;
-
-    if ((fp = popen(cmd, "r")) == NULL) {
-        printf("Error opening pipe!\n");
-        return -1;
-    }
-
-    while (fgets(buf, BUFSIZE, fp) != NULL) {
-        // Do whatever you want here...
-        printf("OUTPUT: %s", buf);
-    }
-
-    if (pclose(fp)) {
-        printf("Command not found or exited with error status\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-char *get_output(char **argv)
-{
-    FILE *fd;
-    fd = popen(argv[0], "r");
-    if (!fd) return NULL;
-
-    char buffer[256];
-    size_t chread;
-    /* String to store entire command contents in */
-    size_t comalloc = 256;
-    size_t comlen = 0;
-    char *comout = malloc(comalloc);
-
-    /* Use fread so binary data is dealt with correctly */
-    while ((chread = fread(buffer, 1, sizeof(buffer), fd)) != 0) {
-        if (comlen + chread >= comalloc) {
-            comalloc *= 2;
-            comout = realloc(comout, comalloc);
-        }
-        memmove(comout + comlen, buffer, chread);
-        comlen += chread;
-    }
-
-    /* We can now work with the output as we please. Just print
-     * out to confirm output is as expected */
-    // fwrite(comout, 1, comlen, stdout);
-    // free(comout);
-    pclose(fd);
-    // return 0;
-    return comout;
-}
-
-typedef struct // dynbuf
+typedef struct dynbuf
 {
     size_t size; // bytes allocated
     size_t len;  // bytes filled
@@ -103,7 +27,7 @@ typedef struct // dynbuf
     int eof;
 } dynbuf;
 
-typedef struct // capture_t
+typedef struct capture_t
 {
     dynbuf childout;
     dynbuf childerr;
@@ -134,10 +58,10 @@ static ssize_t read_dynbuf(int fd, dynbuf *dbuf)
     else if (nread == 0) {
         dbuf->buf[dbuf->len] = '\0';
         dbuf->eof = 1;
-        // debug("capture: eof on fd %d; total read = %d bytes", fd, dbuf->len);
+        debug("capture: eof on fd %d; total read = %zu bytes\n", fd, dbuf->len);
         return 0;
     }
-    // debug("capture: read %d bytes from child via fd %d", nread, fd);
+    debug("capture: read %zu bytes from child via fd %d\n", nread, fd);
     dbuf->len += nread;
     return nread;
 }
@@ -190,7 +114,7 @@ capture_t *capture_child(char *const argv[])
         if (dup2(stderr_pipe[1], STDERR_FILENO) < 0) _exit(1);
 
         execvp(file, argv);
-        // debug("error executing %s: %s\n", file, strerror(errno));
+        debug("error executing %s: %s\n", file, strerror(errno));
         _exit(127);
     }
 
@@ -259,6 +183,8 @@ err:
  * return allocated pointer-to-pointer with sentinel NULL on success,
  * or NULL on failure to allocate initial block of pointers. The number
  * of allocated pointers are doubled each time reallocation required.
+ *
+ * Based on: https://stackoverflow.com/a/60409814
  */
 char **strsplit(const char *src, const char *delim)
 {
@@ -314,40 +240,29 @@ char **strsplit(const char *src, const char *delim)
 void parse_porcelain()
 {
     char *args[] = {"git", "status", "--porcelain=2", "--untracked-files=normal", "--branch", NULL};
-    capture_t *output = capture_child(args);
-    if (!output) fputs("Error getting command output", stderr);
-    char *cstdout = output->childout.buf;
-    char **split;
-    int line = 1;
-    if ((split = strsplit(cstdout, "\n"))) {
-        for (char **p = split; *p; ++p) {
-            printf("L%d: %s\n", line, *p);
-            free(*p);
-            ++line;
+    capture_t *output;
+    if ((output = capture_child(args))) {
+        char *cstdout = output->childout.buf;
+        char **split;
+        int line = 1;
+        if ((split = strsplit(cstdout, "\n"))) {
+            for (char **p = split; *p; ++p) {
+                printf("L%d: %s\n", line, *p);
+                free(*p);
+                ++line;
+            }
+            free(split);
         }
-        free(split);
+    } else {
+        fputs("Error getting command output", stderr);
     }
-    // int i = 0;
-    // for (char *c = cstdout; *c; ++c) {
-    //     if (c == cstdout || *(c - 1) == '\n') {
-    //         ++i;
-    //         // beg of line
-    //         printf("Line %d: ", i);
-    //     }
-    //     putchar(*c);
-    // }
     free_capture(output);
 }
 
 int main()
 {
     const char *s = "This is a test string %s %c buddy!";
-    printf("slen result:      %zu\n", slen(s));
-    printf("strlen result:    %zu\n", strlen(s));
-
-    char *scpy = ft_strdup(s);
-    puts(scpy);
-    free(scpy);
+    debug("char[%zu]:'%s'\n", strlen(s), s);
 
     parse_porcelain();
 
@@ -356,10 +271,10 @@ int main()
             s++;
             switch (*s) {
             case 's':
-                put("STRING");
+                fputs("STRING", stdout);
                 break;
             case 'c':
-                put("CHAR");
+                fputs("CHAR", stdout);
                 break;
             default:
                 fprintf(stderr, "error: invalid format string token: %%%c\n", *s);
