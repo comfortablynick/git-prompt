@@ -1,0 +1,4 @@
+clang
+%c -std=gnu99
+-Wall
+-Wextra
