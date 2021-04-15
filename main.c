@@ -1,5 +1,5 @@
-#define BUFSIZE 128
 #define DEBUG 1
+#define GIT_HASH_LEN 7
 
 #include <errno.h>
 #include <libgen.h>
@@ -179,6 +179,22 @@ err:
     return NULL;
 }
 
+char *str_dup(const char *str)
+{
+    size_t len = strlen(str) + 1;
+    char *p = malloc(len);
+    return p ? memcpy(p, str, len) : NULL;
+}
+
+char *str_ndup(const char *str, size_t n)
+{
+    size_t len = strnlen(str, n);
+    char *p = malloc(len + 1);
+    if (!p) return NULL;
+    p[len] = '\0';
+    return memcpy(p, str, len);
+}
+
 /* Split src into tokens with sentinel NULL after last token.
  * return allocated pointer-to-pointer with sentinel NULL on success,
  * or NULL on failure to allocate initial block of pointers. The number
@@ -186,7 +202,7 @@ err:
  *
  * Based on: https://stackoverflow.com/a/60409814
  */
-char **strsplit(const char *src, const char *delim)
+char **str_split(const char *src, const char *delim)
 {
     int i = 0;     // index
     int in = 0;    // in/out flag
@@ -237,52 +253,105 @@ char **strsplit(const char *src, const char *delim)
     return dest;
 }
 
+typedef struct git_repo
+{
+    char *branch;
+    char *commit;
+    int untracked;
+    int ahead;
+    int behind;
+} git_repo;
+
+/// Allocate new git_repo struct
+git_repo *new_git_repo() { return calloc(1, sizeof(git_repo)); }
+
+/// Completely free git_repo struct
+void free_git_repo(git_repo *repo)
+{
+    if (!repo) return;
+    if (repo->branch) free(repo->branch);
+    if (repo->commit) free(repo->commit);
+    free(repo);
+}
+
+/// Set branch name in git_repo struct
+/// if `len` is -1, use `strlen()`
+int git_repo_set_branch(git_repo *repo, const char *branch, int len)
+{
+    if (repo->branch) free(repo->branch);
+    repo->branch = malloc((len == -1 ? strlen(branch) : len) + 1);
+    if (!repo->branch) return 0;
+    if (len == -1) {
+        strcpy(repo->branch, branch);
+    } else {
+        strncpy(repo->branch, branch, len);
+        repo->branch[len] = 0;
+    }
+    return !!repo->branch;
+}
+
 void parse_porcelain()
 {
     char *args[] = {"git", "status", "--porcelain=2", "--untracked-files=normal", "--branch", NULL};
-    capture_t *output = capture_child(args);
-    if (!output) return;
-    char *commit = NULL;
-    char *cstdout = output->childout.buf;
-    char **split = strsplit(cstdout, "\n");
-    if (!split) return; 
-    int line = 1;
-    for (char **p = split; *p; ++p) {
-        printf("L%d: %s\n", line, *p);
-        if ((commit = strstr(*p, "branch.oid "))) {
-            commit = commit + 11;
+    capture_t *output;
+    git_repo *repo = new_git_repo();
+    if ((output = capture_child(args))) {
+        char *cstdout = output->childout.buf;
+        char **split;
+        int line = 1;
+        if ((split = str_split(cstdout, "\n"))) {
+            for (char **p = split; *p; ++p) {
+                debug("L%d: %s\n", line, *p);
+                char *tmp;
+                if ((tmp = strstr(*p, "branch.oid"))) {
+                    tmp = tmp + 11;
+                    // Only copy first GIT_HASH_LEN chars
+                    repo->commit = strncpy(malloc(GIT_HASH_LEN + 1), tmp, GIT_HASH_LEN);
+                } else if ((tmp = strstr(*p, "branch.head"))) {
+                    tmp = tmp + 12;
+                    // repo->branch = strcpy(malloc(strlen(tmp) + 1), tmp);
+                    git_repo_set_branch(repo, tmp, -1);
+                }
+                free(*p);
+                ++line;
+            }
+            free(split);
         }
-        free(*p);
-        ++line;
+        puts("======== Results ========");
+        printf("Commit:    %s\n", repo->commit);
+        printf("Branch:    %s\n", repo->branch);
+        puts("======= End Results =====\n");
+    } else {
+        fputs("Error getting command output", stderr);
     }
-    free(split);
-    printf("Commit:    %s\n", commit);
     free_capture(output);
+    free_git_repo(repo);
 }
 
 int main()
 {
-    const char *s = "This is a test string %s %c buddy!";
-    debug("char[%zu]:'%s'\n", strlen(s), s);
-
     parse_porcelain();
 
-    for (; *s; s++) {
-        if (*s == '%') {
-            s++;
-            switch (*s) {
-            case 's':
-                fputs("STRING", stdout);
-                break;
-            case 'c':
-                fputs("CHAR", stdout);
-                break;
-            default:
-                fprintf(stderr, "error: invalid format string token: %%%c\n", *s);
-                exit(1);
-            }
-        } else {
-            putchar(*s);
-        }
-    }
+    // const char *s = "This is a test string %s %c buddy!";
+    // debug("char[%zu]:'%s'\n", strlen(s), s);
+
+    // for (; *s; s++) {
+    //     if (*s == '%') {
+    //         s++;
+    //         switch (*s) {
+    //         case 's':
+    //             fputs("STRING", stdout);
+    //             break;
+    //         case 'c':
+    //             fputs("CHAR", stdout);
+    //             break;
+    //         default:
+    //             fprintf(stderr, "error: invalid format string token: %%%c\n", *s);
+    //             exit(1);
+    //         }
+    //     } else {
+    //         putchar(*s);
+    //     }
+    // }
+    // putchar('\n');
 }
