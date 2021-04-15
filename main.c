@@ -240,22 +240,23 @@ char **strsplit(const char *src, const char *delim)
 void parse_porcelain()
 {
     char *args[] = {"git", "status", "--porcelain=2", "--untracked-files=normal", "--branch", NULL};
-    capture_t *output;
-    if ((output = capture_child(args))) {
-        char *cstdout = output->childout.buf;
-        char **split;
-        int line = 1;
-        if ((split = strsplit(cstdout, "\n"))) {
-            for (char **p = split; *p; ++p) {
-                printf("L%d: %s\n", line, *p);
-                free(*p);
-                ++line;
-            }
-            free(split);
+    capture_t *output = capture_child(args);
+    if (!output) return;
+    char *commit = NULL;
+    char *cstdout = output->childout.buf;
+    char **split = strsplit(cstdout, "\n");
+    if (!split) return; 
+    int line = 1;
+    for (char **p = split; *p; ++p) {
+        printf("L%d: %s\n", line, *p);
+        if ((commit = strstr(*p, "branch.oid "))) {
+            commit = commit + 11;
         }
-    } else {
-        fputs("Error getting command output", stderr);
+        free(*p);
+        ++line;
     }
+    free(split);
+    printf("Commit:    %s\n", commit);
     free_capture(output);
 }
 
