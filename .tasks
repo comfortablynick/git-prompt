@@ -2,9 +2,9 @@
 
 # define a new task named "file-build"
 [file-build]
-command=gcc -Wall -O2 -std=c17 "$(VIM_FILEPATH)" -o "$(VIM_PATHNOEXT)"
+command=xmake build
 # working directory, can change to $(VIM_ROOT) for project root
-cwd=$(VIM_FILEDIR)
+cwd=$(VIM_ROOT)
 # output mode, can be one of quickfix and terminal
 # - quickfix: output to quickfix window
 # - terminal: run the command in the internal terminal
@@ -17,9 +17,18 @@ save=1
 
 [file-run]
 # Build and run
-command = gcc -Wall -O2 -std=gnu99 "$(VIM_FILEPATH)" -o "$(VIM_PATHNOEXT)" && "$(VIM_PATHNOEXT)"
+; command = xmake build && ./build/linux/x86_64/release/ctest
+command = xmake build && xmake run
 output  = terminal
 pos     = right
-cwd     = $(VIM_FILEDIR)
+cwd     = $(VIM_ROOT)
 save    = 1
+focus   = 0
+
+[memcheck]
+# Run valgrind memory check
+command = valgrind --leak-check=full --show-reachable=yes ./build/linux/x86_64/release/ctest
+output  = terminal
+pos     = right
+cwd     = $(VIM_ROOT)
 focus   = 0

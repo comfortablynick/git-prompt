@@ -1,16 +1,14 @@
 #define DEBUG 1
 #define GIT_HASH_LEN 7
 
-#include <errno.h>
 #include <libgen.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include "util.h"
 
 #define debug(fmt, ...)                                                                            \
     do {                                                                                           \
@@ -179,80 +177,6 @@ err:
     return NULL;
 }
 
-char *str_dup(const char *str)
-{
-    size_t len = strlen(str) + 1;
-    char *p = malloc(len);
-    return p ? memcpy(p, str, len) : NULL;
-}
-
-char *str_ndup(const char *str, size_t n)
-{
-    size_t len = strnlen(str, n);
-    char *p = malloc(len + 1);
-    if (!p) return NULL;
-    p[len] = '\0';
-    return memcpy(p, str, len);
-}
-
-/* Split src into tokens with sentinel NULL after last token.
- * return allocated pointer-to-pointer with sentinel NULL on success,
- * or NULL on failure to allocate initial block of pointers. The number
- * of allocated pointers are doubled each time reallocation required.
- *
- * Based on: https://stackoverflow.com/a/60409814
- */
-char **str_split(const char *src, const char *delim)
-{
-    int i = 0;     // index
-    int in = 0;    // in/out flag
-    int nptrs = 2; // initial # of ptrs to allocate (must be > 0)
-    char **dest = NULL;
-    const char *p = src;
-    const char *ep = p;
-
-    // allocate ptrs
-    if (!(dest = malloc(nptrs * sizeof *dest))) {
-        perror("malloc-dest");
-        return NULL;
-    }
-    *dest = NULL;
-
-    for (;;) {
-        if (!*ep || strchr(delim, *ep)) {
-            size_t len = ep - p;
-            if (in && len) {
-                if (i == nptrs - 1) {
-                    // realloc dest to temporary pointer/validate
-                    void *tmp = realloc(dest, 2 * nptrs * sizeof *dest);
-                    if (!tmp) {
-                        perror("realloc-dest");
-                        break; // don't exit, original dest still valid
-                    }
-                    dest = tmp; // assign reallocated block to dest
-                    nptrs *= 2; // increment allocated pointer count
-                }
-                // allocate/validate storage for token
-                if (!(dest[i] = malloc(len + 1))) {
-                    perror("malloc-dest[i]");
-                    break;
-                }
-                memcpy(dest[i], p, len); // copy len chars to storage
-                dest[i++][len] = 0;      // nul-terminate, advance index
-                dest[i] = NULL;          // set next pointer NULL
-            }
-            if (!*ep) // if at end, break
-                break;
-            in = 0;
-        } else {             // normal word char
-            if (!in) p = ep; // update start to end-pointer
-            in = 1;
-        }
-        ep++;
-    }
-    return dest;
-}
-
 typedef struct git_repo
 {
     char *branch;
@@ -275,19 +199,19 @@ void free_git_repo(git_repo *repo)
 }
 
 /// Set branch name in git_repo struct
-/// if `len` is -1, use `strlen()`
-int git_repo_set_branch(git_repo *repo, const char *branch, int len)
+int git_repo_set_branch(git_repo *repo, const char *branch, size_t len)
 {
     if (repo->branch) free(repo->branch);
-    repo->branch = malloc((len == -1 ? strlen(branch) : len) + 1);
-    if (!repo->branch) return 0;
-    if (len == -1) {
-        strcpy(repo->branch, branch);
-    } else {
-        strncpy(repo->branch, branch, len);
-        repo->branch[len] = 0;
-    }
+    repo->branch = str_ndup(branch, len);
     return !!repo->branch;
+}
+
+/// Set branch name in git_repo struct
+int git_repo_set_commit(git_repo *repo, const char *commit, size_t len)
+{
+    if (repo->commit) free(repo->commit);
+    repo->commit = str_ndup(commit, len);
+    return !!repo->commit;
 }
 
 void parse_porcelain()
@@ -306,11 +230,10 @@ void parse_porcelain()
                 if ((tmp = strstr(*p, "branch.oid"))) {
                     tmp = tmp + 11;
                     // Only copy first GIT_HASH_LEN chars
-                    repo->commit = strncpy(malloc(GIT_HASH_LEN + 1), tmp, GIT_HASH_LEN);
+                    git_repo_set_commit(repo, tmp, GIT_HASH_LEN);
                 } else if ((tmp = strstr(*p, "branch.head"))) {
                     tmp = tmp + 12;
-                    // repo->branch = strcpy(malloc(strlen(tmp) + 1), tmp);
-                    git_repo_set_branch(repo, tmp, -1);
+                    git_repo_set_branch(repo, tmp, 0);
                 }
                 free(*p);
                 ++line;
