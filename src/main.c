@@ -181,7 +181,9 @@ typedef struct git_repo
 {
     char *branch;
     char *commit;
+    int changed;
     int untracked;
+    int unmerged;
     int ahead;
     int behind;
 } git_repo;
@@ -234,6 +236,8 @@ void parse_porcelain()
                 } else if ((tmp = strstr(*p, "branch.head"))) {
                     tmp = tmp + 12;
                     git_repo_set_branch(repo, tmp, 0);
+                } else if (*p[0] == '?') {
+                    ++repo->untracked;
                 }
                 free(*p);
                 ++line;
@@ -243,6 +247,7 @@ void parse_porcelain()
         puts("======== Results ========");
         printf("Commit:    %s\n", repo->commit);
         printf("Branch:    %s\n", repo->branch);
+        printf("Untracked: %d\n", repo->untracked);
         puts("======= End Results =====\n");
     } else {
         fputs("Error getting command output", stderr);
