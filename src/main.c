@@ -1,6 +1,8 @@
 #define DEBUG 1
 #define GIT_HASH_LEN 7
 
+#include "util.h"
+#include <ctype.h>
 #include <libgen.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -8,7 +10,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include "util.h"
 
 #define debug(fmt, ...)                                                                            \
     do {                                                                                           \
@@ -222,22 +223,43 @@ void parse_porcelain()
     capture_t *output;
     git_repo *repo = new_git_repo();
     if ((output = capture_child(args))) {
-        char *cstdout = output->childout.buf;
+        const char *cstdout = output->childout.buf;
         char **split;
         int line = 1;
-        if ((split = str_split(cstdout, "\n"))) {
+        size_t line_ct;
+        if ((split = str_split(cstdout, "\n", &line_ct))) {
+            debug("Stdout contains %zu lines\n", line_ct);
             for (char **p = split; *p; ++p) {
                 debug("L%d: %s\n", line, *p);
                 char *tmp;
-                if ((tmp = strstr(*p, "branch.oid"))) {
-                    tmp = tmp + 11;
-                    // Only copy first GIT_HASH_LEN chars
-                    git_repo_set_commit(repo, tmp, GIT_HASH_LEN);
-                } else if ((tmp = strstr(*p, "branch.head"))) {
-                    tmp = tmp + 12;
-                    git_repo_set_branch(repo, tmp, 0);
+                const char *commit = "branch.oid";
+                const char *branch = "branch.head";
+                const char *ab = "branch.ab";
+                if ((tmp = strstr(*p, commit))) {
+                    git_repo_set_commit(repo, tmp + strlen(commit) + 1, GIT_HASH_LEN);
+                } else if ((tmp = strstr(*p, branch))) {
+                    git_repo_set_branch(repo, tmp + strlen(branch) + 1, 0);
+                } else if ((tmp = strstr(*p, ab))) {
+                    tmp = tmp + strlen(ab) + 1;
+                    debug("Ahead/behind: %s\n", tmp);
+                    int found = 0;
+                    while (*tmp) {
+                        if (isdigit(*tmp)) {
+                            int val = (int)strtol(tmp, &tmp, 10);
+                            if (found == 0) {
+                                repo->ahead = val;
+                            } else {
+                                repo->behind = val;
+                            }
+                            ++found;
+                        } else {
+                            ++tmp;
+                        }
+                    }
                 } else if (*p[0] == '?') {
                     ++repo->untracked;
+                } else if (*p[0] == '1') {
+                    ++repo->changed;
                 }
                 free(*p);
                 ++line;
@@ -245,9 +267,12 @@ void parse_porcelain()
             free(split);
         }
         puts("======== Results ========");
-        printf("Commit:    %s\n", repo->commit);
-        printf("Branch:    %s\n", repo->branch);
-        printf("Untracked: %d\n", repo->untracked);
+        printf("Commit:      %s\n", repo->commit);
+        printf("Branch:      %s\n", repo->branch);
+        printf("Changed:     %d\n", repo->changed);
+        printf("Untracked:   %d\n", repo->untracked);
+        printf("Ahead:       %d\n", repo->ahead);
+        printf("Behind:      %d\n", repo->behind);
         puts("======= End Results =====\n");
     } else {
         fputs("Error getting command output", stderr);
