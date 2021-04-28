@@ -1,4 +1,10 @@
 -- luacheck: ignore 1
+
+-- enable debug symbols
+if is_mode("debug") then
+  set_symbols("debug")
+end
+
 target("ctest")
     set_kind("binary")
     add_files("src/*.c")
