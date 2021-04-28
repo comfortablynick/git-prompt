@@ -7,26 +7,13 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "log.h"
 
 static options_t *_options = NULL;
 
 void set_options(options_t *options) { _options = options; }
 
 int debug_mode() { return _options->debug; }
-
-void debug(char *fmt, ...)
-{
-    va_list args;
-
-    if (!_options->debug) return;
-
-    va_start(args, fmt);
-    fputs("DEBUG: ", stderr);
-    vfprintf(stderr, fmt, args);
-    fputc('\n', stderr);
-    va_end(args);
-}
-
 
 static void init_dynbuf(dynbuf *dbuf, int bufsize)
 {
@@ -51,10 +38,10 @@ static ssize_t read_dynbuf(int fd, dynbuf *dbuf)
     else if (nread == 0) {
         dbuf->buf[dbuf->len] = '\0';
         dbuf->eof = 1;
-        debug("capture: eof on fd %d; total read = %zu bytes", fd, dbuf->len);
+        log_trace("capture: eof on fd %d; total read = %zu bytes", fd, dbuf->len);
         return 0;
     }
-    debug("capture: read %zu bytes from child via fd %d", nread, fd);
+    log_trace("capture: read %zu bytes from child via fd %d", nread, fd);
     dbuf->len += nread;
     return nread;
 }
@@ -107,7 +94,7 @@ capture_t *capture_child(char *const argv[])
         if (dup2(stderr_pipe[1], STDERR_FILENO) < 0) _exit(1);
 
         execvp(file, argv);
-        debug("error executing %s: %s", file, strerror(errno));
+        log_error("error executing %s: %s", file, strerror(errno));
         _exit(127);
     }
 
@@ -157,10 +144,10 @@ capture_t *capture_child(char *const argv[])
     else if (WIFSIGNALED(status))
         result->signal = WTERMSIG(status);
 
-    if (result->status != 0) debug("child process %s exited with status %d", file, result->status);
-    if (result->signal != 0) debug("child process %s killed by signal %d", file, result->signal);
+    if (result->status != 0) log_debug("child process %s exited with status %d", file, result->status);
+    if (result->signal != 0) log_warn("child process %s killed by signal %d", file, result->signal);
     if (result->childerr.len > 0)
-        debug("child process %s wrote to stderr:%s", file, result->childerr.buf);
+        log_debug("child process %s wrote to stderr:%s", file, result->childerr.buf);
     return result;
 err:
     if (stdout_pipe[0] > -1) close(stdout_pipe[0]);
@@ -218,41 +205,6 @@ char *str_ndup(const char *str, const size_t n)
     if (!p) return NULL;
     p[len] = '\0';
     return memcpy(p, str, len);
-}
-
-
-char **string_split(const char *s, char sep, size_t *n)
-{
-    const unsigned int rate = 8;
-    char **out = calloc(rate, sizeof(char *));
-    if (!out) return NULL;
-    size_t ctr = 0;
-    unsigned int blocks = rate;
-    const char *where;
-    while ((where = strchr(s, sep))) {
-        size_t size = (size_t)(where - s);
-        out[ctr] = str_ndup(s, size);
-        if (!out[ctr]) return NULL;
-        ctr++;
-        if (ctr == blocks) {
-            blocks += rate;
-            out = (char **)realloc(out, sizeof(char *) * blocks);
-            if (!out) return NULL;
-        }
-        s += size + 1;
-    }
-    if (s[0]) {
-        out[ctr] = str_ndup(s, 0);
-        if (!out[ctr]) return NULL;
-        ctr++;
-    }
-    out = realloc(out, sizeof(char *) * (ctr + 1));
-    if (!out) return NULL;
-    out[ctr] = NULL;
-
-    if (n) *n = ctr;
-
-    return out;
 }
 
 char **str_split(const char *src, const char *delim, size_t *n)

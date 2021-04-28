@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/types.h>
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -87,8 +88,5 @@ char *str_ndup(const char *str, size_t n);
 /// Set `n` to the size of pointer-to-pointer array if `n != NULL`
 /// Based on: https://stackoverflow.com/a/60409814
 char **str_split(const char *src, const char *delim, size_t *n);
-
-/// Split string based on single delimiter; return pointer-to-pointer to char
-char **string_split(const char *s, char sep, size_t *n);
 
 #endif // #define UTIL_H

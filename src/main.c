@@ -1,6 +1,4 @@
-#define DEBUG 1
-#define GIT_HASH_LEN 7
-
+#include "log.h"
 #include "util.h"
 #include <ctype.h>
 #include <stdlib.h>
@@ -10,12 +8,9 @@
 #include <time.h>
 #include <unistd.h>
 
-// #define debug(fmt, ...)                                                                            \
-//     do {                                                                                           \
-//         if (DEBUG)                                                                                 \
-//             fprintf(stderr, "DEBUG:%s:%d:%s(): " fmt, basename(__FILE__), __LINE__, __func__,      \
-//                     ##__VA_ARGS__);                                                                \
-//     } while (0)
+#ifndef GIT_HASH_LEN
+#define GIT_HASH_LEN 7
+#endif
 
 typedef struct git_repo
 {
@@ -59,7 +54,7 @@ int git_repo_set_commit(git_repo *repo, const char *commit, size_t len)
 /// Set number of commits ahead/behind upstream
 int git_repo_set_ahead_behind(git_repo *repo, char *buf)
 {
-    debug("Ahead/behind: %s", buf);
+    log_debug("Ahead/behind: %s", buf);
     int found = 0;
     while (*buf) {
         if (isdigit(*buf)) {
@@ -88,9 +83,9 @@ void parse_porcelain()
         int line = 1;
         size_t line_ct;
         if ((split = str_split(cstdout, "\n", &line_ct))) {
-            debug("Stdout contains %zu lines", line_ct);
+            log_debug("Stdout contains %zu lines", line_ct);
             for (char **p = split; *p; ++p) {
-                debug("L%d: %s", line, *p);
+                log_debug("L%d: %s", line, *p);
                 char *tmp;
                 const char *commit = "branch.oid";
                 const char *branch = "branch.head";
@@ -117,16 +112,17 @@ void parse_porcelain()
             }
             free(split);
         }
-        puts("======== Results ========");
-        printf("Commit:      %s\n", repo->commit);
-        printf("Branch:      %s\n", repo->branch);
-        printf("Changed:     %d\n", repo->changed);
-        printf("Untracked:   %d\n", repo->untracked);
-        printf("Ahead:       %d\n", repo->ahead);
-        printf("Behind:      %d\n", repo->behind);
-        puts("======= End Results =====\n");
+        log_debug("Repo results:\n"
+                  "Commit:    %s\n"
+                  "Branch:    %s\n"
+                  "Changed:   %d\n"
+                  "Untracked: %d\n"
+                  "Ahead:     %d\n"
+                  "Behind:    %d\n",
+                  repo->commit, repo->branch, repo->changed, repo->untracked, repo->ahead,
+                  repo->behind);
     } else {
-        fputs("Error getting command output", stderr);
+        log_error("Error getting command output: %s", args[0]);
     }
     free_capture(output);
     free_git_repo(repo);
@@ -135,7 +131,7 @@ void parse_porcelain()
 int main()
 {
     options_t options = {
-        .debug = 1,
+        .debug = 2,
         .format = NULL,
         .directory = NULL,
         .show_branch = 0,
@@ -145,10 +141,15 @@ int main()
     };
     set_options(&options);
 
+    int log_level = 2 - options.debug;
+    log_set_level(log_level);
+#ifdef LOG_USE_COLOR
+    log_debug("Color logging enabled!");
+#endif
     parse_porcelain();
 
     // const char *s = "This is a test string %s %c buddy!";
-    // debug("char[%zu]:'%s'\n", strlen(s), s);
+    // log_debug("char[%zu]:'%s'\n", strlen(s), s);
 
     // for (; *s; s++) {
     //     if (*s == '%') {
