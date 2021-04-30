@@ -1,6 +1,7 @@
 #include "log.h"
 #include "util.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -128,10 +129,10 @@ void parse_porcelain()
     free_git_repo(repo);
 }
 
-int main()
+int main(int argc, char **argv)
 {
     options_t options = {
-        .debug = 2,
+        .debug = 0,
         .format = NULL,
         .directory = NULL,
         .show_branch = 0,
@@ -141,12 +142,49 @@ int main()
     };
     set_options(&options);
 
-    int log_level = 2 - options.debug;
+    int opt;
+    while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
+        switch (opt) {
+        case 'd':
+            log_set_quiet(false);
+            ++options.debug;
+            break;
+        case 'q':
+            options.debug = -1;
+            log_set_quiet(true);
+            break;
+        case 'f':
+            options.format = optarg;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-d] [-f FMT] [directory]\n", argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    int log_level = 0 - options.debug;
     log_set_level(log_level);
-#ifdef LOG_USE_COLOR
-    log_debug("Color logging enabled!");
+#ifndef LOG_USE_COLOR
+    log_debug("Set -DLOG_USE_COLOR for color logging");
 #endif
+
+    if (log_level <= LOG_TRACE && argc > 1) {
+        // Print command line args (after prog name)
+        for (int i = 1; i < argc; ++i) log_trace("argv[%d]: %s", i, argv[i]);
+    }
+
     parse_porcelain();
+
+    log_debug("Parsed options:\n"
+              "Debug:         %d\n"
+              "Format:        %s\n"
+              "Directory:     %s\n"
+              "Show branch:   %d\n"
+              "Show revision: %d\n"
+              "Show unknown:  %d\n"
+              "Show modified: %d\n",
+              options.debug, options.format, options.directory, options.show_branch,
+              options.show_revision, options.show_unknown, options.show_modified);
 
     // const char *s = "This is a test string %s %c buddy!";
     // log_debug("char[%zu]:'%s'\n", strlen(s), s);
