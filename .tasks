@@ -17,7 +17,6 @@ save=1
 
 [file-run]
 # Build and run
-; command = xmake build && ./build/linux/x86_64/release/ctest
 command = xmake build && xmake run
 output  = terminal
 pos     = right
@@ -27,7 +26,7 @@ focus   = 0
 
 [memcheck]
 # Run valgrind memory check
-command = valgrind --leak-check=full --show-reachable=yes ./build/linux/x86_64/release/ctest
+command = valgrind --leak-check=full --show-reachable=yes ./build/linux/x86_64/release/git-prompt
 output  = terminal
 pos     = right
 cwd     = $(VIM_ROOT)

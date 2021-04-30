@@ -4,7 +4,7 @@ if is_mode("debug") then
   set_symbols("debug")
 end
 
-target("ctest")
+target("git-prompt")
     set_kind("binary")
     add_files("src/*.c")
     set_languages("gnu99")
