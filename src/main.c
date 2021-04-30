@@ -1,6 +1,8 @@
 #include "log.h"
 #include "util.h"
 #include <ctype.h>
+#include <errno.h>
+#include <libgen.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +131,30 @@ void parse_porcelain()
     free_git_repo(repo);
 }
 
+void parse_args(int argc, char **argv, options_t *options)
+{
+    int opt;
+    while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
+        switch (opt) {
+        case 'd':
+            log_set_quiet(false);
+            ++options->debug;
+            break;
+        case 'q':
+            options->debug = -1;
+            log_set_quiet(true);
+            break;
+        case 'f':
+            options->format = optarg;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-d] [-f FMT] <directory>\n", basename(argv[0]));
+            exit(EXIT_FAILURE);
+        }
+    }
+    if (argv[optind]) options->directory = argv[optind];
+}
+
 int main(int argc, char **argv)
 {
     options_t options = {
@@ -140,28 +166,15 @@ int main(int argc, char **argv)
         .show_unknown = 0,
         .show_modified = 0,
     };
+    parse_args(argc, argv, &options);
     set_options(&options);
 
-    int opt;
-    while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
-        switch (opt) {
-        case 'd':
-            log_set_quiet(false);
-            ++options.debug;
-            break;
-        case 'q':
-            options.debug = -1;
-            log_set_quiet(true);
-            break;
-        case 'f':
-            options.format = optarg;
-            break;
-        default:
-            fprintf(stderr, "Usage: %s [-d] [-f FMT] [directory]\n", argv[0]);
-            exit(EXIT_FAILURE);
+    if (options.directory) {
+        if (chdir(options.directory) == -1) {
+            log_fatal("chdir to \"%s\" failed: %s", options.directory, strerror(errno));
+            // TODO: handle error
         }
     }
-
     int log_level = 0 - options.debug;
     log_set_level(log_level);
 #ifndef LOG_USE_COLOR
@@ -172,9 +185,6 @@ int main(int argc, char **argv)
         // Print command line args (after prog name)
         for (int i = 1; i < argc; ++i) log_trace("argv[%d]: %s", i, argv[i]);
     }
-
-    parse_porcelain();
-
     log_debug("Parsed options:\n"
               "Debug:         %d\n"
               "Format:        %s\n"
@@ -185,6 +195,8 @@ int main(int argc, char **argv)
               "Show modified: %d\n",
               options.debug, options.format, options.directory, options.show_branch,
               options.show_revision, options.show_unknown, options.show_modified);
+
+    parse_porcelain();
 
     // const char *s = "This is a test string %s %c buddy!";
     // log_debug("char[%zu]:'%s'\n", strlen(s), s);

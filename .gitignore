@@ -1,3 +1,4 @@
 main
 .xmake
 build/
+test_repo/
