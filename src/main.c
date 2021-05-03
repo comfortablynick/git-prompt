@@ -81,7 +81,7 @@ int git_repo_set_ahead_behind(git_repo *repo, char *buf)
 void parse_porcelain()
 {
     char *args[] = {"git", "status", "--porcelain=2", "--untracked-files=normal", "--branch", NULL};
-    capture_t *output;
+    struct capture *output;
     git_repo *repo = new_git_repo();
     if ((output = capture_child(args))) {
         const char *cstdout = output->childout.buf;
@@ -135,7 +135,7 @@ void parse_porcelain()
 }
 
 /// Parse cli arguments into options_t object
-void parse_args(int argc, char **argv, options_t *options)
+void parse_args(int argc, char **argv, struct options *options)
 {
     int opt;
     while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
@@ -160,7 +160,7 @@ void parse_args(int argc, char **argv, options_t *options)
 }
 
 /// Parse format string to options_t object
-void parse_format(options_t *opts) {
+void parse_format(struct options *opts) {
     for (char *fmt = opts->format; *fmt; ++fmt) {
         if (*fmt == '%') {
             ++fmt;
@@ -186,13 +186,12 @@ void parse_format(options_t *opts) {
     }
 }
 
-void parse_result(char *out) {
-
-}
+// void parse_result(char *out) {
+// }
 
 int main(int argc, char **argv)
 {
-    options_t options = {
+    struct options options = {
         .debug = 0,
         .format = NULL,
         .directory = NULL,

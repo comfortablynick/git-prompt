@@ -9,13 +9,13 @@
 #include <unistd.h>
 #include "log.h"
 
-static options_t *_options = NULL;
+static struct options *_options = NULL;
 
-void set_options(options_t *options) { _options = options; }
+void set_options(struct options *options) { _options = options; }
 
 int debug_mode() { return _options->debug; }
 
-static void init_dynbuf(dynbuf *dbuf, int bufsize)
+static void init_dynbuf(struct dynbuf *dbuf, int bufsize)
 {
     dbuf->size = bufsize;
     dbuf->len = 0;
@@ -23,7 +23,7 @@ static void init_dynbuf(dynbuf *dbuf, int bufsize)
     dbuf->eof = 0;
 }
 
-static ssize_t read_dynbuf(int fd, dynbuf *dbuf)
+static ssize_t read_dynbuf(int fd, struct dynbuf *dbuf)
 {
     size_t avail = dbuf->size - dbuf->len;
     if (avail < 1024) {
@@ -46,7 +46,7 @@ static ssize_t read_dynbuf(int fd, dynbuf *dbuf)
     return nread;
 }
 
-void free_capture(capture_t *result)
+void free_capture(struct capture *result)
 {
     if (result) {
         if (result->childout.buf) free(result->childout.buf);
@@ -55,10 +55,10 @@ void free_capture(capture_t *result)
     }
 }
 
-capture_t *new_capture()
+struct capture *new_capture()
 {
     int bufsize = 4096;
-    capture_t *result = malloc(sizeof(capture_t));
+    struct capture *result = malloc(sizeof(struct capture));
     if (!result) goto err;
     init_dynbuf(&result->childout, bufsize);
     if (!result->childout.buf) goto err;
@@ -73,12 +73,12 @@ err:
     return NULL;
 }
 
-capture_t *capture_child(char *const argv[])
+struct capture *capture_child(char *const argv[])
 {
     const char *file = *argv;
     int stdout_pipe[] = {-1, -1};
     int stderr_pipe[] = {-1, -1};
-    capture_t *result = NULL;
+    struct capture *result = NULL;
     if (pipe(stdout_pipe) < 0) goto err;
     if (pipe(stderr_pipe) < 0) goto err;
 

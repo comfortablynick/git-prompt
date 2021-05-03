@@ -5,7 +5,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-typedef struct // options_t
+struct options
 {
     int debug;
     // e.g. "[%b%u%m]"
@@ -24,46 +24,46 @@ typedef struct // options_t
     unsigned int timeout;
     // directory to check if not cwd
     char *directory;
-} options_t;
+};
 
 /// Set static options struct
-void set_options(options_t *options);
+void set_options(struct options *options);
 
 /// Check if static debug mode is enabled
 int debug_mode();
 
 /// Dynamically allocated buffer for reading files
-typedef struct // dynbuf
+struct dynbuf
 {
     size_t size; // bytes allocated
     size_t len;  // bytes filled
     char *buf;
     int eof;
-} dynbuf;
+};
 
 /// Subprocess output capture
-typedef struct // capture_t
+struct capture
 {
-    dynbuf childout;
-    dynbuf childerr;
+    struct dynbuf childout;
+    struct dynbuf childerr;
     int status; // exit status that child passed (if any)
     int signal; // signal that killed the child (if any)
-} capture_t;
+};
 
 /// Allocate new dynbuf
-static void init_dynbuf(dynbuf *dbuf, int bufsize);
+static void init_dynbuf(struct dynbuf *dbuf, int bufsize);
 
 /// Read file into dynbuf
-static ssize_t read_dynbuf(int fd, dynbuf *dbuf);
+static ssize_t read_dynbuf(int fd, struct dynbuf *dbuf);
 
 /// Free dynbuf memory as needed
-void free_capture(capture_t *result);
+void free_capture(struct capture *result);
 
 /// Allocate new Subprocess capture
-capture_t *new_capture();
+struct capture *new_capture();
 
 /// Spawn subprocess to capture command
-capture_t *capture_child(char *const argv[]);
+struct capture *capture_child(char *const argv[]);
 
 /// Alternative to strtol which allows '+' and '-' prefixes
 int strtoint_n(const char *str, int n);
