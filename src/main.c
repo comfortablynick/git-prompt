@@ -15,6 +15,9 @@
 #define GIT_HASH_LEN 7
 #endif
 
+#ifndef FMT_STRING
+#define FMT_STRING "%b"
+#endif
 typedef struct git_repo
 {
     char *branch;
@@ -131,6 +134,7 @@ void parse_porcelain()
     free_git_repo(repo);
 }
 
+/// Parse cli arguments into options_t object
 void parse_args(int argc, char **argv, options_t *options)
 {
     int opt;
@@ -145,7 +149,7 @@ void parse_args(int argc, char **argv, options_t *options)
             log_set_quiet(true);
             break;
         case 'f':
-            options->format = optarg;
+            options->format = str_ndup(optarg, 0);
             break;
         default:
             fprintf(stderr, "Usage: %s [-d] [-f FMT] <directory>\n", basename(argv[0]));
@@ -155,18 +159,52 @@ void parse_args(int argc, char **argv, options_t *options)
     if (argv[optind]) options->directory = argv[optind];
 }
 
+/// Parse format string to options_t object
+void parse_format(options_t *opts) {
+    for (char *fmt = opts->format; *fmt; ++fmt) {
+        if (*fmt == '%') {
+            ++fmt;
+            switch (*fmt) {
+                case 'b':
+                    opts->show_branch = true;
+                    break;
+                case 'c':
+                    opts->show_commit = true;
+                    break;
+                case 'u':
+                    opts->show_untracked = true;
+                    break;
+                case 'm':
+                    opts->show_modified = true;
+                    break;
+                default:
+                    log_error("error: invalid format string token: %%%c\n", *fmt);
+                    fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
+                    exit(1);
+            }
+        }
+    }
+}
+
+void parse_result(char *out) {
+
+}
+
 int main(int argc, char **argv)
 {
     options_t options = {
         .debug = 0,
         .format = NULL,
         .directory = NULL,
-        .show_branch = 0,
-        .show_revision = 0,
-        .show_unknown = 0,
-        .show_modified = 0,
+        .show_branch = false,
+        .show_commit = false,
+        .show_untracked = false,
+        .show_modified = false,
     };
     parse_args(argc, argv, &options);
+
+    if (!options.format) options.format = str_ndup(FMT_STRING, 0);
+    parse_format(&options);
     set_options(&options);
 
     if (options.directory) {
@@ -190,34 +228,11 @@ int main(int argc, char **argv)
               "Format:        %s\n"
               "Directory:     %s\n"
               "Show branch:   %d\n"
-              "Show revision: %d\n"
+              "Show commit:   %d\n"
               "Show unknown:  %d\n"
               "Show modified: %d\n",
               options.debug, options.format, options.directory, options.show_branch,
-              options.show_revision, options.show_unknown, options.show_modified);
+              options.show_commit, options.show_untracked, options.show_modified);
 
     parse_porcelain();
-
-    // const char *s = "This is a test string %s %c buddy!";
-    // log_debug("char[%zu]:'%s'\n", strlen(s), s);
-
-    // for (; *s; s++) {
-    //     if (*s == '%') {
-    //         s++;
-    //         switch (*s) {
-    //         case 's':
-    //             fputs("STRING", stdout);
-    //             break;
-    //         case 'c':
-    //             fputs("CHAR", stdout);
-    //             break;
-    //         default:
-    //             fprintf(stderr, "error: invalid format string token: %%%c\n", *s);
-    //             exit(1);
-    //         }
-    //     } else {
-    //         putchar(*s);
-    //     }
-    // }
-    // putchar('\n');
 }

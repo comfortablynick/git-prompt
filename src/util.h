@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 #ifndef UTIL_H
@@ -7,14 +8,22 @@
 typedef struct // options_t
 {
     int debug;
-    char *format;         /* e.g. "[%b%u%m]" */
-    int show_branch;      /* show current branch? */
-    int show_revision;    /* show current revision? */
-    int show_patch;       /* show patch name? */
-    int show_unknown;     /* show ? if unknown files? */
-    int show_modified;    /* show + if local changes? */
-    unsigned int timeout; /* timeout in milliseconds */
-    char *directory;      /* directory to check if not cwd */
+    // e.g. "[%b%u%m]"
+    char *format;
+    // show current branch
+    bool show_branch;
+    // show current commit sha
+    bool show_commit;
+    // show patch name
+    bool show_patch;
+    // show unknown files
+    bool show_untracked;
+    // show local changes
+    bool show_modified;
+    // timeout in milliseconds
+    unsigned int timeout;
+    // directory to check if not cwd
+    char *directory;
 } options_t;
 
 /// Set static options struct
@@ -22,15 +31,6 @@ void set_options(options_t *options);
 
 /// Check if static debug mode is enabled
 int debug_mode();
-
-/// printf()-style debug output of fmt and other args to stderr
-///
-/// Only operates if debug mode is on (e.g. from the command line -d).
-void debug(char *fmt, ...);
-
-/**********************
- * Dynbuf and friends *
- **********************/
 
 /// Dynamically allocated buffer for reading files
 typedef struct // dynbuf
@@ -65,9 +65,6 @@ capture_t *new_capture();
 /// Spawn subprocess to capture command
 capture_t *capture_child(char *const argv[]);
 
-/********************
- * String functions *
- ********************/
 /// Alternative to strtol which allows '+' and '-' prefixes
 int strtoint_n(const char *str, int n);
 
