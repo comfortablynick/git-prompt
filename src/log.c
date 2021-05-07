@@ -21,6 +21,7 @@
  */
 
 #include "log.h"
+#include <time.h>
 
 #define MAX_CALLBACKS 32
 

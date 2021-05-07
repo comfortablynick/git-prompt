@@ -1,17 +1,27 @@
 #include "util.h"
+#include "log.h"
 #include <errno.h>
-#include <libgen.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "log.h"
 
 static struct options *_options = NULL;
 
+struct options *new_options() { return (struct options *)calloc(1, sizeof(struct options)); };
+
 void set_options(struct options *options) { _options = options; }
+
+void free_options(struct options *options)
+{
+    if (options) {
+        if (options->format) free(options->format);
+        if (options->directory) free(options->directory);
+        free(options);
+    }
+}
 
 int debug_mode() { return _options->debug; }
 
@@ -59,7 +69,7 @@ struct capture *new_capture()
 {
     int bufsize = 4096;
     struct capture *result = malloc(sizeof(struct capture));
-    if (!result) goto err;
+    if (!result) return NULL;
     init_dynbuf(&result->childout, bufsize);
     if (!result->childout.buf) goto err;
 
@@ -82,7 +92,6 @@ struct capture *capture_child(char *const argv[])
     if (pipe(stdout_pipe) < 0) goto err;
     if (pipe(stderr_pipe) < 0) goto err;
 
-    // for(; *argv; ++argv) puts(*argv);
     pid_t pid = fork();
     if (pid < 0) {
         goto err;
@@ -108,8 +117,7 @@ struct capture *capture_child(char *const argv[])
     int cstdout = stdout_pipe[0];
     int cstderr = stderr_pipe[0];
 
-    int done = 0;
-    while (!done) {
+    for (int done = 0; !done;) {
         int maxfd = -1;
         fd_set child_fds;
         FD_ZERO(&child_fds);
@@ -144,7 +152,8 @@ struct capture *capture_child(char *const argv[])
     else if (WIFSIGNALED(status))
         result->signal = WTERMSIG(status);
 
-    if (result->status != 0) log_debug("child process %s exited with status %d", file, result->status);
+    if (result->status != 0)
+        log_debug("child process %s exited with status %d", file, result->status);
     if (result->signal != 0) log_warn("child process %s killed by signal %d", file, result->signal);
     if (result->childerr.len > 0)
         log_debug("child process %s wrote to stderr:%s", file, result->childerr.buf);

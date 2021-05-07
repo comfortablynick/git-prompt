@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #ifndef UTIL_H
@@ -21,13 +22,19 @@ struct options
     // show local changes
     bool show_modified;
     // timeout in milliseconds
-    unsigned int timeout;
+    uint8_t timeout;
     // directory to check if not cwd
     char *directory;
 };
 
+/// Allocate new options struct
+struct options *new_options();
+
 /// Set static options struct
 void set_options(struct options *options);
+
+/// Free allocated memory on options object as needed
+void free_options(struct options *options);
 
 /// Check if static debug mode is enabled
 int debug_mode();

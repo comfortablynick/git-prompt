@@ -2,3 +2,4 @@ main
 .xmake
 build/
 test_repo/
+compile_commands.json
