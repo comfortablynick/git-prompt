@@ -18,7 +18,8 @@
 #ifndef FMT_STRING
 #define FMT_STRING "%b@%c"
 #endif
-typedef struct git_repo
+
+struct git_repo
 {
     char *branch;
     char *commit;
@@ -27,22 +28,39 @@ typedef struct git_repo
     uint8_t unmerged;
     uint8_t ahead;
     uint8_t behind;
-} git_repo;
-
-/// Allocate new git_repo struct
-git_repo *new_git_repo() { return calloc(1, sizeof(git_repo)); }
+    // Helper functions
+    void (*sprint)(const struct git_repo*, char*);
+    void (*free)(struct git_repo*);
+    int (*set_branch)(struct git_repo*, const char*, size_t);
+    int (*set_commit)(struct git_repo*, const char*, size_t);
+    int (*set_ahead_behind)(struct git_repo*, char*);
+};
 
 /// Completely free git_repo struct
-void free_git_repo(git_repo *repo)
+static void _git_repo_free(struct git_repo *self)
 {
-    if (!repo) return;
-    if (repo->branch) free(repo->branch);
-    if (repo->commit) free(repo->commit);
-    free(repo);
+    if (!self) return;
+    if (self->branch) free(self->branch);
+    if (self->commit) free(self->commit);
+    free(self);
+}
+
+/// Set buf to debug repr of git_repo
+static void _git_repo_debug(const struct git_repo *self, char *buf)
+{
+    sprintf(buf,
+            "Repo results:\n"
+            "Commit:    %s\n"
+            "Branch:    %s\n"
+            "Changed:   %d\n"
+            "Untracked: %d\n"
+            "Ahead:     %d\n"
+            "Behind:    %d\n",
+            self->commit, self->branch, self->changed, self->untracked, self->ahead, self->behind);
 }
 
 /// Set branch name in git_repo struct
-int git_repo_set_branch(git_repo *repo, const char *branch, size_t len)
+static int _git_repo_set_branch(struct git_repo *repo, const char *branch, size_t len)
 {
     if (repo->branch) free(repo->branch);
     repo->branch = str_ndup(branch, len);
@@ -50,7 +68,7 @@ int git_repo_set_branch(git_repo *repo, const char *branch, size_t len)
 }
 
 /// Set branch name in git_repo struct
-int git_repo_set_commit(git_repo *repo, const char *commit, size_t len)
+static int _git_repo_set_commit(struct git_repo *repo, const char *commit, size_t len)
 {
     if (repo->commit) free(repo->commit);
     repo->commit = str_ndup(commit, len);
@@ -58,7 +76,7 @@ int git_repo_set_commit(git_repo *repo, const char *commit, size_t len)
 }
 
 /// Set number of commits ahead/behind upstream
-int git_repo_set_ahead_behind(git_repo *repo, char *buf)
+static int _git_repo_set_ahead_behind(struct git_repo *repo, char *buf)
 {
     log_debug("Ahead/behind: %s", buf);
     int found = 0;
@@ -78,11 +96,23 @@ int git_repo_set_ahead_behind(git_repo *repo, char *buf)
     return !!found;
 }
 
+/// Allocate new git_repo struct
+struct git_repo *new_git_repo() {
+    struct git_repo *repo = calloc(1, sizeof(struct git_repo));
+    repo->sprint = _git_repo_debug;
+    repo->free = _git_repo_free;
+    repo->set_branch = _git_repo_set_branch;
+    repo->set_commit = _git_repo_set_commit;
+    repo->set_ahead_behind = _git_repo_set_ahead_behind;
+    return repo;
+}
+
 void parse_porcelain(struct git_repo *repo, struct options *opts)
 {
     char *args[] = {
         "git",      "-C", opts->directory, "status", "--porcelain=2", "--untracked-files=normal",
         "--branch", NULL};
+    if (!opts->show_untracked) args[5] = "--untracked-files=no";
     struct capture *output;
     if ((output = capture_child(args))) {
         const char *cstdout = output->childout.buf;
@@ -98,17 +128,17 @@ void parse_porcelain(struct git_repo *repo, struct options *opts)
                 const char *branch = "branch.head";
                 const char *ab = "branch.ab";
                 if ((tmp = strstr(*p, commit))) {
-                    if ((!git_repo_set_commit(repo, tmp + strlen(commit) + 1, GIT_HASH_LEN))) {
+                    if ((!repo->set_commit(repo, tmp + strlen(commit) + 1, GIT_HASH_LEN))) {
                         fputs("Error setting repo commit", stderr);
                         break;
                     }
                 } else if ((tmp = strstr(*p, branch))) {
-                    if ((!git_repo_set_branch(repo, tmp + strlen(branch) + 1, 0))) {
+                    if ((!repo->set_branch(repo, tmp + strlen(branch) + 1, 0))) {
                         fputs("Error setting repo branch", stderr);
                         break;
                     }
                 } else if ((tmp = strstr(*p, ab))) {
-                    if ((!git_repo_set_ahead_behind(repo, tmp + strlen(ab) + 1))) {
+                    if ((!repo->set_ahead_behind(repo, tmp + strlen(ab) + 1))) {
                         fputs("Error setting repo ahead/behind", stderr);
                         break;
                     }
@@ -122,15 +152,9 @@ void parse_porcelain(struct git_repo *repo, struct options *opts)
             }
             free(split);
         }
-        log_debug("Repo results:\n"
-                  "Commit:    %s\n"
-                  "Branch:    %s\n"
-                  "Changed:   %d\n"
-                  "Untracked: %d\n"
-                  "Ahead:     %d\n"
-                  "Behind:    %d\n",
-                  repo->commit, repo->branch, repo->changed, repo->untracked, repo->ahead,
-                  repo->behind);
+        char repo_debug[1024];
+        repo->sprint(repo, repo_debug);
+        log_debug("%s", repo_debug);
     } else {
         log_error("Error getting command output: %s", args[0]);
     }
@@ -268,5 +292,5 @@ int main(int argc, char **argv)
     free(buf);
 
     free_options(options);
-    free_git_repo(repo);
+    repo->free(repo);
 }

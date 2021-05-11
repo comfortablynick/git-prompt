@@ -86,6 +86,14 @@ err:
 struct capture *capture_child(char *const argv[])
 {
     const char *file = *argv;
+    if (log_get_level() >= LOG_TRACE) {
+        char cmd_debug[256] = "";
+        for (char *const *p = argv; *p; ++p) {
+            strcat(cmd_debug, *p);
+            strcat(cmd_debug, " \0");
+        }
+        log_trace("capture: %s", cmd_debug);
+    }
     int stdout_pipe[] = {-1, -1};
     int stderr_pipe[] = {-1, -1};
     struct capture *result = NULL;

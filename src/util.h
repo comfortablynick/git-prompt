@@ -3,12 +3,14 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#ifndef UTIL_H
-#define UTIL_H
+#pragma once
 
 struct options
 {
+    // debug verbosity
     int debug;
+    // debug logger level
+    int log_level;
     // e.g. "[%b%u%m]"
     char *format;
     // show current branch
@@ -92,5 +94,3 @@ char *str_ndup(const char *str, size_t n);
 /// Set `n` to the size of pointer-to-pointer array if `n != NULL`
 /// Based on: https://stackoverflow.com/a/60409814
 char **str_split(const char *src, const char *delim, size_t *n);
-
-#endif // #define UTIL_H
