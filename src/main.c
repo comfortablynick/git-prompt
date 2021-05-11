@@ -78,9 +78,11 @@ int git_repo_set_ahead_behind(git_repo *repo, char *buf)
     return !!found;
 }
 
-void parse_porcelain(struct git_repo *repo)
+void parse_porcelain(struct git_repo *repo, struct options *opts)
 {
-    char *args[] = {"git", "status", "--porcelain=2", "--untracked-files=normal", "--branch", NULL};
+    char *args[] = {
+        "git",      "-C", opts->directory, "status", "--porcelain=2", "--untracked-files=normal",
+        "--branch", NULL};
     struct capture *output;
     if ((output = capture_child(args))) {
         const char *cstdout = output->childout.buf;
@@ -160,7 +162,11 @@ struct options *parse_args(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
     }
-    if (argv[optind]) options->directory = argv[optind];
+    if (argv[optind]) {
+        options->directory = realpath(argv[optind], NULL);
+    } else {
+        options->directory = getcwd(NULL, 0);
+    }
     return options;
 }
 
@@ -229,12 +235,6 @@ int main(int argc, char **argv)
     parse_format(options);
     set_options(options);
 
-    if (options->directory) {
-        if (chdir(options->directory) == -1) {
-            log_fatal("chdir to \"%s\" failed: %s", options->directory, strerror(errno));
-            // TODO: handle error
-        }
-    }
     int log_level = 0 - options->debug;
     log_set_level(log_level);
 #ifndef LOG_USE_COLOR
@@ -257,7 +257,7 @@ int main(int argc, char **argv)
               options->show_commit, options->show_untracked, options->show_modified);
 
     struct git_repo *repo = new_git_repo();
-    parse_porcelain(repo);
+    parse_porcelain(repo, options);
     FILE *stream;
     char *buf;
     size_t buflen;

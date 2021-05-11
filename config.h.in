@@ -1,0 +1,6 @@
+#ifndef GP_CONFIG_H
+#define GP_CONFIG_H
+
+#define GP_CONFIG_VERSION "${VERSION}"
+#define GP_FMT_STRING "${FMT_STRING}"
+#endif // GP_CONFIG_H
