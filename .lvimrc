@@ -1,0 +1,3 @@
+nnoremap <Leader>r <Cmd>AsyncTask run<CR>
+nnoremap <Leader>i <Cmd>AsyncTask install<CR>
+nnoremap <Leader>m <Cmd>AsyncTask memcheck<CR>

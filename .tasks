@@ -15,19 +15,28 @@ errorformat=%f:%l:%m
 # save file before execute
 save=1
 
-[file-run]
-# Build and run
-command = xmake build && xmake run
+[run]
+# Build, install and run
+command = xmake build && git-prompt
 output  = terminal
-pos     = right
+pos     = tmux
+cwd     = $(VIM_ROOT)
+save    = 1
+focus   = 0
+
+[install]
+# Build, install and run
+command = xmake build && xmake install
+output  = terminal
+pos     = tmux
 cwd     = $(VIM_ROOT)
 save    = 1
 focus   = 0
 
 [memcheck]
 # Run valgrind memory check
-command = valgrind --leak-check=full --show-reachable=yes ./build/linux/x86_64/release/git-prompt
+command = valgrind --leak-check=full --show-reachable=yes git-prompt
 output  = terminal
-pos     = right
+pos     = tmux
 cwd     = $(VIM_ROOT)
 focus   = 0

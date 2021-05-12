@@ -170,7 +170,7 @@ struct options *parse_args(int argc, char **argv)
     int opt;
     while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
         switch (opt) {
-        case 'd':
+        case 'v':
             log_set_quiet(false);
             ++options->debug;
             break;
@@ -182,7 +182,28 @@ struct options *parse_args(int argc, char **argv)
             options->format = str_ndup(optarg, 0);
             break;
         default:
-            fprintf(stderr, "Usage: %s [-d] [-f FMT] <directory>\n", basename(argv[0]));
+            fprintf(stderr, "Usage: %s [-h] [-V] [-v] [-t MSECS] [-f FORMAT] [dir]\n%s",
+                    basename(argv[0]),
+                    "\nFlags:\n"
+                    "  -h   show this help message and exit\n"
+                    "  -V   show program version\n"
+                    "  -v   increase console debug verbosity (-v, -vv, -vvv)\n"
+                    "\nArguments:\n"
+                    "  -t   timeout threshold, in milliseconds\n"
+                    "  -f   tokenized string that determines output\n"
+                    "       %b  show branch\n"
+                    "       %c  show commit hash\n"
+                    "       %u  indicate unknown (untracked) files with '?'\n"
+                    "       %U  show count of unknown files\n"
+                    "       %m  indicate uncommitted changes (modified/added/removed) with '*'\n"
+                    "       %M  show count of uncommitted changes\n"
+                    "       %n  insert newline\n"
+                    "       %%  show '%'\n"
+                    "  dir  location of git repo (default is current working directory)\n"
+                    "\nEnvironment:\n"
+                    "  $GITPROMPT_FORMAT  variable containing FORMAT string");
+
+            fprintf(stderr, " (default=\"%s\")\n", FMT_STRING);
             free(options);
             exit(EXIT_FAILURE);
         }
@@ -191,6 +212,11 @@ struct options *parse_args(int argc, char **argv)
         options->directory = realpath(argv[optind], NULL);
     } else {
         options->directory = getcwd(NULL, 0);
+    }
+    if (!options->format) {
+        char *format = getenv("GITPROMPT_FORMAT");
+        if (!format) format = FMT_STRING;
+        options->format = str_ndup(format, 0);
     }
     return options;
 }
@@ -215,9 +241,7 @@ void parse_format(struct options *opts)
                 opts->show_modified = true;
                 break;
             default:
-                log_error("error: invalid format string token: %%%c\n", *fmt);
-                fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
-                exit(1);
+                break;
             }
         }
     }
@@ -242,13 +266,28 @@ void parse_result(struct git_repo *repo, const char *format, FILE *stream)
                 if (repo->untracked) fprintf(stream, "%d", repo->untracked);
                 break;
             case 'm':
-                fprintf(stream, "*%d", repo->changed);
+                if (repo->changed) putc('*', stream);
+                break;
+            case 'M':
+                if (repo->changed) fprintf(stream, "%d", repo->changed);
+                break;
+            case 'n':
+                putc('\n', stream);
+                break;
+            case '\\':
+                if (*++fmt == 'n') putc('\n', stream);
                 break;
             default:
                 log_error("error: invalid format string token: %%%c\n", *fmt);
                 fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
                 exit(1);
             }
+            } else if (*fmt == '\\') {
+                if (*++fmt == 'n') {
+                    putc('\n', stream);
+                } else {
+                    log_warn("invalid escape sequence in format string: \\%s", fmt);
+                }
         } else {
             fputc(*fmt, stream);
         }
@@ -285,7 +324,6 @@ void test_parse()
 int main(int argc, char **argv)
 {
     struct options *options = parse_args(argc, argv);
-    if (!options->format) options->format = str_ndup(FMT_STRING, 0);
     parse_format(options);
     options->set(options);
 
