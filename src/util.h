@@ -1,45 +1,41 @@
-#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/types.h>
 
 #pragma once
 
+/// Store options set from command line
 struct options
 {
-    // debug verbosity
+    /// Debug verbosity
     int debug;
-    // debug logger level
-    int log_level;
-    // e.g. "[%b%u%m]"
+    /// Output format (print-f style) string e.g. "[%b%u%m]"
     char *format;
-    // show current branch
+    /// Show current branch
     bool show_branch;
-    // show current commit sha
+    /// Show current commit sha
     bool show_commit;
-    // show patch name
+    /// Show patch name
     bool show_patch;
-    // show unknown files
+    /// Show untracked (unknown) files
     bool show_untracked;
-    // show local changes
+    /// Show local changes
     bool show_modified;
-    // timeout in milliseconds
+    /// Timeout in milliseconds for command to complete
     uint8_t timeout;
-    // directory to check if not cwd
+    /// Directory to use for git commands
     char *directory;
+    /// Set static options object
+    void (*set)(const struct options *);
+    /// Free options object
+    void (*free)(struct options *);
+    /// Print options object
+    void (*sprint)(const struct options *, char *);
 };
 
 /// Allocate new options struct
 struct options *new_options();
-
-/// Set static options struct
-void set_options(struct options *options);
-
-/// Free allocated memory on options object as needed
-void free_options(struct options *options);
-
-/// Check if static debug mode is enabled
-int debug_mode();
 
 /// Dynamically allocated buffer for reading files
 struct dynbuf

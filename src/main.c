@@ -1,5 +1,6 @@
 #include "log.h"
 #include "util.h"
+#include <assert.h>
 #include <bits/getopt_core.h>
 #include <ctype.h>
 #include <errno.h>
@@ -29,11 +30,11 @@ struct git_repo
     uint8_t ahead;
     uint8_t behind;
     // Helper functions
-    void (*sprint)(const struct git_repo*, char*);
-    void (*free)(struct git_repo*);
-    int (*set_branch)(struct git_repo*, const char*, size_t);
-    int (*set_commit)(struct git_repo*, const char*, size_t);
-    int (*set_ahead_behind)(struct git_repo*, char*);
+    void (*sprint)(const struct git_repo *, char *);
+    void (*free)(struct git_repo *);
+    int (*set_branch)(struct git_repo *, const char *, size_t);
+    int (*set_commit)(struct git_repo *, const char *, size_t);
+    int (*set_ahead_behind)(struct git_repo *, char *);
 };
 
 /// Completely free git_repo struct
@@ -49,13 +50,12 @@ static void _git_repo_free(struct git_repo *self)
 static void _git_repo_debug(const struct git_repo *self, char *buf)
 {
     sprintf(buf,
-            "Repo results:\n"
             "Commit:    %s\n"
             "Branch:    %s\n"
             "Changed:   %d\n"
             "Untracked: %d\n"
             "Ahead:     %d\n"
-            "Behind:    %d\n",
+            "Behind:    %d",
             self->commit, self->branch, self->changed, self->untracked, self->ahead, self->behind);
 }
 
@@ -97,7 +97,8 @@ static int _git_repo_set_ahead_behind(struct git_repo *repo, char *buf)
 }
 
 /// Allocate new git_repo struct
-struct git_repo *new_git_repo() {
+struct git_repo *new_git_repo()
+{
     struct git_repo *repo = calloc(1, sizeof(struct git_repo));
     repo->sprint = _git_repo_debug;
     repo->free = _git_repo_free;
@@ -154,7 +155,7 @@ void parse_porcelain(struct git_repo *repo, struct options *opts)
         }
         char repo_debug[1024];
         repo->sprint(repo, repo_debug);
-        log_debug("%s", repo_debug);
+        log_debug("Repo results:\n%s", repo_debug);
     } else {
         log_error("Error getting command output: %s", args[0]);
     }
@@ -222,9 +223,9 @@ void parse_format(struct options *opts)
     }
 }
 
-void parse_result(struct git_repo *repo, struct options *opts, FILE *stream)
+void parse_result(struct git_repo *repo, const char *format, FILE *stream)
 {
-    for (char *fmt = opts->format; *fmt; ++fmt) {
+    for (const char *fmt = format; *fmt; ++fmt) {
         if (*fmt == '%') {
             ++fmt;
             switch (*fmt) {
@@ -235,7 +236,10 @@ void parse_result(struct git_repo *repo, struct options *opts, FILE *stream)
                 fprintf(stream, "%s", repo->commit);
                 break;
             case 'u':
-                fprintf(stream, "?%d", repo->untracked);
+                if (repo->untracked) putc('?', stream);
+                break;
+            case 'U':
+                if (repo->untracked) fprintf(stream, "%d", repo->untracked);
                 break;
             case 'm':
                 fprintf(stream, "*%d", repo->changed);
@@ -252,45 +256,60 @@ void parse_result(struct git_repo *repo, struct options *opts, FILE *stream)
     fflush(stream);
 }
 
+/// Set up repo struct and test result of parse function
+void test_parse()
+{
+    struct git_repo repo = {.branch = "test",
+                            .commit = "abcd1234",
+                            .ahead = 1,
+                            .behind = 2,
+                            .changed = 10,
+                            .untracked = 100};
+    const char *format = "%b@%c %m %u";
+    const char *expected = "test@abcd1234 *10 ?100";
+    FILE *stream;
+    char *buf;
+    size_t buflen;
+    stream = open_memstream(&buf, &buflen);
+    parse_result(&repo, format, stream);
+    fclose(stream);
+    log_debug("Test results\n"
+              "Result:    {buf=%s, len=%zu}\n"
+              "Expected:  {buf=%s, len=%zu}\n"
+              "Match:     %d",
+              buf, buflen, expected, strlen(expected), (strcmp(buf, expected) == 0));
+    assert((strcmp(buf, expected) == 0));
+    free(buf);
+}
+
 int main(int argc, char **argv)
 {
     struct options *options = parse_args(argc, argv);
     if (!options->format) options->format = str_ndup(FMT_STRING, 0);
     parse_format(options);
-    set_options(options);
+    options->set(options);
 
     int log_level = 0 - options->debug;
     log_set_level(log_level);
 #ifndef LOG_USE_COLOR
     log_debug("Set -DLOG_USE_COLOR for color logging");
 #endif
-
     if (log_level <= LOG_TRACE && argc > 1) {
         // Print command line args (after prog name)
         for (int i = 1; i < argc; ++i) log_trace("argv[%d]: %s", i, argv[i]);
     }
-    log_debug("Parsed options:\n"
-              "Debug:         %d\n"
-              "Format:        %s\n"
-              "Directory:     %s\n"
-              "Show branch:   %d\n"
-              "Show commit:   %d\n"
-              "Show unknown:  %d\n"
-              "Show modified: %d\n",
-              options->debug, options->format, options->directory, options->show_branch,
-              options->show_commit, options->show_untracked, options->show_modified);
-
+    if (log_level <= LOG_DEBUG) {
+        char opts_debug[1024];
+        options->sprint(options, opts_debug);
+        log_debug("Parsed options:\n%s", opts_debug);
+    }
     struct git_repo *repo = new_git_repo();
     parse_porcelain(repo, options);
-    FILE *stream;
-    char *buf;
-    size_t buflen;
-    stream = open_memstream(&buf, &buflen);
-    parse_result(repo, options, stream);
-    fclose(stream);
-    log_debug("buf=%s, len=%zu", buf, buflen);
-    free(buf);
-
-    free_options(options);
+    parse_result(repo, options->format, stdout);
+    options->free(options);
     repo->free(repo);
+
+    // Testing
+    // putchar('\n');
+    // test_parse();
 }

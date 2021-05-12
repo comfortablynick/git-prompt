@@ -8,13 +8,25 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static struct options *_options = NULL;
+static const struct options *_options = NULL;
 
-struct options *new_options() { return (struct options *)calloc(1, sizeof(struct options)); };
+void _options_debug(const struct options *options, char *buf)
+{
+    sprintf(buf,
+            "Debug:         %d\n"
+            "Format:        %s\n"
+            "Directory:     %s\n"
+            "Show branch:   %d\n"
+            "Show commit:   %d\n"
+            "Show unknown:  %d\n"
+            "Show modified: %d",
+            options->debug, options->format, options->directory, options->show_branch,
+            options->show_commit, options->show_untracked, options->show_modified);
+}
 
-void set_options(struct options *options) { _options = options; }
+static void _options_set(const struct options *options) { _options = options; }
 
-void free_options(struct options *options)
+static void _options_free(struct options *options)
 {
     if (options) {
         if (options->format) free(options->format);
@@ -23,7 +35,13 @@ void free_options(struct options *options)
     }
 }
 
-int debug_mode() { return _options->debug; }
+struct options *new_options() {
+    struct options *options = (struct options *)calloc(1, sizeof(struct options));
+    options->set = _options_set;
+    options->free = _options_free;
+    options->sprint = _options_debug;
+    return options;
+}
 
 static void init_dynbuf(struct dynbuf *dbuf, int bufsize)
 {
