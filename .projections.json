@@ -1,0 +1,4 @@
+{
+  "src/*.c": {"alternate": "src/{}.h"},
+  "src/*.h": {"alternate": "src/{}.c"}
+}

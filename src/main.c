@@ -331,7 +331,7 @@ void test_parse()
                             .behind = 2,
                             .changed = 0,
                             .untracked = 100};
-    const char *format = "%b@%c %m%M %u%U %a%A%z%Z";
+    const char *format = "  %b@%c %m%M %u%U %a%A%z%Z  ";
     const char *expected = "test@abcd1234 ?100 ↑1↓2";
     FILE *stream;
     char *buf;
@@ -339,7 +339,7 @@ void test_parse()
     stream = open_memstream(&buf, &buflen);
     parse_result(&repo, format, stream);
     fclose(stream);
-    buflen = str_collapse_whitespace(buf);
+    buflen = str_squish(buf, true);
     puts("Test results");
     puts("------------");
     printf("Test 1\n"

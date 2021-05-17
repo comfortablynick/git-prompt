@@ -298,20 +298,17 @@ char **str_split(const char *src, const char *delim, size_t *n)
     return dest;
 }
 
-size_t str_collapse_whitespace(char *str)
+size_t str_squish(char *str, bool trim)
 {
-    char *dst = str;
-    char *src = str;
-    char c;
-    while ((c = *src++)) {
-        if (isspace(c)) {
-            *dst++ = ' ';
-            while ((c = *src++) && isspace(c))
-                ;
-            if (!c) break;
-        }
-        *dst++ = c;
+    char *save = str;
+    char *from = str;
+    if (trim)
+        while (isspace(*from)) ++from;
+    for (; *from; ++from) {
+        if (isspace(*from) && isspace(*(from - 1))) continue;
+        *str++ = *from;
     }
-    *dst = '\0';
-    return (dst - str);
+    if (trim && isspace(*(str - 1))) --str;
+    *str = '\0';
+    return (str - save);
 }
