@@ -20,6 +20,14 @@
 #define FMT_STRING "%b@%c"
 #endif
 
+// Constants
+static const char *AHEAD_GLYPH = "↑";
+static const char *BEHIND_GLYPH = "↓";
+static const char *DIRTY_GLYPH = "*";
+static const char *UNTRACKED_GLYPH = "?";
+
+void test_parse();
+
 struct git_repo
 {
     char *branch;
@@ -168,7 +176,7 @@ struct options *parse_args(int argc, char **argv)
     struct options *options = new_options();
     if (!options) return NULL;
     int opt;
-    while ((opt = getopt(argc, argv, "hqdf:")) != -1) {
+    while ((opt = getopt(argc, argv, "hqdTt:f:")) != -1) {
         switch (opt) {
         case 'v':
             log_set_quiet(false);
@@ -181,6 +189,13 @@ struct options *parse_args(int argc, char **argv)
         case 'f':
             options->format = str_ndup(optarg, 0);
             break;
+        case 't':
+            options->timeout = strtol(optarg, NULL, 10);
+            break;
+        case 'T':
+            test_parse();
+            exit(EXIT_SUCCESS);
+            break;
         default:
             fprintf(stderr, "Usage: %s [-h] [-V] [-v] [-t MSECS] [-f FORMAT] [dir]\n%s",
                     basename(argv[0]),
@@ -190,18 +205,20 @@ struct options *parse_args(int argc, char **argv)
                     "  -v   increase console debug verbosity (-v, -vv, -vvv)\n"
                     "\nArguments:\n"
                     "  -t   timeout threshold, in milliseconds\n"
+                    "  -T   run internal tests\n"
                     "  -f   tokenized string that determines output\n"
                     "       %b  show branch\n"
                     "       %c  show commit hash\n"
                     "       %u  indicate unknown (untracked) files with '?'\n"
                     "       %U  show count of unknown files\n"
-                    "       %m  indicate uncommitted changes (modified/added/removed) with '*'\n"
+                    "       %m  indicate uncommitted changes with '*'\n"
                     "       %M  show count of uncommitted changes\n"
-                    "       %n  insert newline\n"
+                    "       %a  indicate unpushed changes with '^'\n"
+                    "       %A  show count of unpushed changes\n"
                     "       %%  show '%'\n"
-                    "  dir  location of git repo (default is current working directory)\n"
+                    "  dir  location of git repo (default is cwd)\n"
                     "\nEnvironment:\n"
-                    "  $GITPROMPT_FORMAT  variable containing FORMAT string");
+                    "  $GITPROMPT_FORMAT  format string");
 
             fprintf(stderr, " (default=\"%s\")\n", FMT_STRING);
             free(options);
@@ -260,21 +277,31 @@ void parse_result(struct git_repo *repo, const char *format, FILE *stream)
                 fprintf(stream, "%s", repo->commit);
                 break;
             case 'u':
-                if (repo->untracked) putc('?', stream);
+                if (repo->untracked) fputs(UNTRACKED_GLYPH, stream);
                 break;
             case 'U':
                 if (repo->untracked) fprintf(stream, "%d", repo->untracked);
                 break;
             case 'm':
-                if (repo->changed) putc('*', stream);
+                if (repo->changed) fputs(DIRTY_GLYPH, stream);
                 break;
             case 'M':
                 if (repo->changed) fprintf(stream, "%d", repo->changed);
                 break;
-            case 'n':
-                putc('\n', stream);
+            case 'a':
+                if (repo->ahead) fputs(AHEAD_GLYPH, stream);
+                break;
+            case 'A':
+                if (repo->ahead) fprintf(stream, "%d", repo->ahead);
+                break;
+            case 'z':
+                if (repo->behind) fputs(BEHIND_GLYPH, stream);
+                break;
+            case 'Z':
+                if (repo->behind) fprintf(stream, "%d", repo->behind);
                 break;
             case '\\':
+                // escape sequence
                 if (*++fmt == 'n') putc('\n', stream);
                 break;
             default:
@@ -282,12 +309,12 @@ void parse_result(struct git_repo *repo, const char *format, FILE *stream)
                 fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
                 exit(1);
             }
-            } else if (*fmt == '\\') {
-                if (*++fmt == 'n') {
-                    putc('\n', stream);
-                } else {
-                    log_warn("invalid escape sequence in format string: \\%s", fmt);
-                }
+        } else if (*fmt == '\\') {
+            if (*++fmt == 'n') {
+                putc('\n', stream);
+            } else {
+                log_warn("invalid escape sequence in format string: \\%s", fmt);
+            }
         } else {
             fputc(*fmt, stream);
         }
@@ -304,19 +331,21 @@ void test_parse()
                             .behind = 2,
                             .changed = 10,
                             .untracked = 100};
-    const char *format = "%b@%c %m %u";
-    const char *expected = "test@abcd1234 *10 ?100";
+    const char *format = "%b@%c %m%M %u%U %a%A%z%Z";
+    const char *expected = "test@abcd1234 *10 ?100 ↑1↓2";
     FILE *stream;
     char *buf;
     size_t buflen;
     stream = open_memstream(&buf, &buflen);
     parse_result(&repo, format, stream);
     fclose(stream);
-    log_debug("Test results\n"
-              "Result:    {buf=%s, len=%zu}\n"
-              "Expected:  {buf=%s, len=%zu}\n"
-              "Match:     %d",
-              buf, buflen, expected, strlen(expected), (strcmp(buf, expected) == 0));
+    puts("Test results");
+    puts("------------");
+    printf("Test 1\n"
+           "    Result:    {buf=%s, len=%zu}\n"
+           "    Expected:  {buf=%s, len=%zu}\n"
+           "    Match:     %d\n",
+           buf, buflen, expected, strlen(expected), (strcmp(buf, expected) == 0));
     assert((strcmp(buf, expected) == 0));
     free(buf);
 }
