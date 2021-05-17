@@ -90,3 +90,6 @@ char *str_ndup(const char *str, size_t n);
 /// Set `n` to the size of pointer-to-pointer array if `n != NULL`
 /// Based on: https://stackoverflow.com/a/60409814
 char **str_split(const char *src, const char *delim, size_t *n);
+
+/// Squeeze whitespace in char array and return new size
+size_t str_collapse_whitespace(char *str);

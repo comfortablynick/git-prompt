@@ -1,5 +1,6 @@
 #include "util.h"
 #include "log.h"
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -295,4 +296,22 @@ char **str_split(const char *src, const char *delim, size_t *n)
     }
     if (n) *n = i;
     return dest;
+}
+
+size_t str_collapse_whitespace(char *str)
+{
+    char *dst = str;
+    char *src = str;
+    char c;
+    while ((c = *src++)) {
+        if (isspace(c)) {
+            *dst++ = ' ';
+            while ((c = *src++) && isspace(c))
+                ;
+            if (!c) break;
+        }
+        *dst++ = c;
+    }
+    *dst = '\0';
+    return (dst - str);
 }
