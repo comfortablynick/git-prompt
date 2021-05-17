@@ -1,16 +1,17 @@
-#include "log.h"
-#include "util.h"
-#include <assert.h>
-#include <bits/getopt_core.h>
-#include <ctype.h>
-#include <errno.h>
-#include <libgen.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include "log.h"              // for log_set_quiet, log_debug, log_set_level
+#include "options.h"          // for options, new_options
+#include "util.h"             // for str_ndup, capture_child, free_capture
+#include "capture.h"
+#include <assert.h>           // for assert
+#include <bits/getopt_core.h> // for getopt, optarg, optind
+#include <ctype.h>            // for isdigit
+#include <libgen.h>           // for basename
+#include <stdbool.h>          // for true, false
+#include <stdint.h>           // for uint8_t
+#include <stdio.h>            // for fprintf, fputs, putc, puts, size_t
+#include <stdlib.h>           // for free, exit, strtol, calloc, getenv
+#include <string.h>           // for strlen, strcmp, strstr
+#include <unistd.h>           // for getcwd
 
 #ifndef GIT_HASH_LEN
 #define GIT_HASH_LEN 7
@@ -373,11 +374,17 @@ int main(int argc, char **argv)
     }
     struct git_repo *repo = new_git_repo();
     parse_porcelain(repo, options);
-    parse_result(repo, options->format, stdout);
+
+    // Write result to buffer and print all at once
+    FILE *stream;
+    char *buf;
+    size_t buflen;
+    stream = open_memstream(&buf, &buflen);
+    parse_result(repo, options->format, stream);
+    fclose(stream);
+    str_squish(buf, true);
+    fputs(buf, stdout);
     options->free(options);
     repo->free(repo);
-
-    // Testing
-    // putchar('\n');
-    // test_parse();
+    free(buf);
 }
