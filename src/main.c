@@ -1,6 +1,5 @@
 #include "capture.h"
 #include "log.h"
-#include "options.h"
 #include "repo.h"
 #include "util.h"             // for str_ndup, capture_child, free_capture
 #include <assert.h>           // for assert
@@ -11,10 +10,6 @@
 #include <stdlib.h>           // for free, exit, strtol, calloc, getenv
 #include <string.h>           // for strlen, strcmp, strstr
 #include <unistd.h>           // for getcwd
-
-#ifndef GIT_HASH_LEN
-#define GIT_HASH_LEN 7
-#endif
 
 #ifndef FMT_STRING
 #define FMT_STRING "%b@%c"
@@ -27,59 +22,6 @@ static const char *DIRTY_GLYPH = "*";
 static const char *UNTRACKED_GLYPH = "…";
 
 void test_parse();
-void parse_porcelain(struct git_repo *repo, struct options *opts)
-{
-    char *args[] = {
-        "git",      "-C", opts->directory, "status", "--porcelain=2", "--untracked-files=normal",
-        "--branch", NULL};
-    if (!opts->show_untracked) args[5] = "--untracked-files=no";
-    struct capture *output;
-    if ((output = capture_child(args))) {
-        const char *cstdout = output->childout.buf;
-        char **split;
-        int line = 1;
-        size_t line_ct;
-        if ((split = str_split(cstdout, "\n", &line_ct))) {
-            log_debug("Stdout contains %zu lines", line_ct);
-            for (char **p = split; *p; ++p) {
-                log_debug("L%d: %s", line, *p);
-                char *tmp;
-                const char *commit = "branch.oid";
-                const char *branch = "branch.head";
-                const char *ab = "branch.ab";
-                if ((tmp = strstr(*p, commit))) {
-                    if ((!repo->set_commit(repo, tmp + strlen(commit) + 1, GIT_HASH_LEN))) {
-                        fputs("Error setting repo commit", stderr);
-                        break;
-                    }
-                } else if ((tmp = strstr(*p, branch))) {
-                    if ((!repo->set_branch(repo, tmp + strlen(branch) + 1, 0))) {
-                        fputs("Error setting repo branch", stderr);
-                        break;
-                    }
-                } else if ((tmp = strstr(*p, ab))) {
-                    if ((!repo->set_ahead_behind(repo, tmp + strlen(ab) + 1))) {
-                        fputs("Error setting repo ahead/behind", stderr);
-                        break;
-                    }
-                } else if (*p[0] == '?') {
-                    ++repo->untracked;
-                } else if (*p[0] == '1') {
-                    ++repo->changed;
-                }
-                free(*p);
-                ++line;
-            }
-            free(split);
-        }
-        char repo_debug[1024];
-        repo->sprint(repo, repo_debug);
-        log_debug("Repo results:\n%s", repo_debug);
-    } else {
-        log_error("Error getting command output: %s", args[0]);
-    }
-    free_capture(output);
-}
 
 /// Parse cli arguments into options struct
 struct options *parse_args(int argc, char **argv)
@@ -87,7 +29,7 @@ struct options *parse_args(int argc, char **argv)
     struct options *options = new_options();
     if (!options) return NULL;
     int opt;
-    while ((opt = getopt(argc, argv, "hqdTt:f:")) != -1) {
+    while ((opt = getopt(argc, argv, "hqvTt:f:")) != -1) {
         switch (opt) {
         case 'v':
             log_set_quiet(false);

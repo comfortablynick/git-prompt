@@ -1,4 +1,4 @@
-#include <stdio.h>     // for size_t
+#include <stdio.h> // for size_t
 
 #pragma once
 
@@ -18,10 +18,9 @@ struct capture
     struct dynbuf childerr;
     int status; // exit status that child passed (if any)
     int signal; // signal that killed the child (if any)
-};
 
-/// Free dynbuf memory as needed
-void free_capture(struct capture *result);
+    void (*free)(struct capture *);
+};
 
 /// Allocate new Subprocess capture
 struct capture *new_capture();

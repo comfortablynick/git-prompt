@@ -39,12 +39,12 @@ static ssize_t read_dynbuf(int fd, struct dynbuf *dbuf)
     return nread;
 }
 
-void free_capture(struct capture *result)
+static void free_capture(struct capture *self)
 {
-    if (result) {
-        if (result->childout.buf) free(result->childout.buf);
-        if (result->childerr.buf) free(result->childerr.buf);
-        free(result);
+    if (self) {
+        if (self->childout.buf) free(self->childout.buf);
+        if (self->childerr.buf) free(self->childerr.buf);
+        free(self);
     }
 }
 
@@ -53,6 +53,8 @@ struct capture *new_capture()
     int bufsize = 4096;
     struct capture *result = malloc(sizeof(struct capture));
     if (!result) return NULL;
+    result->free = free_capture;
+
     init_dynbuf(&result->childout, bufsize);
     if (!result->childout.buf) goto err;
 
