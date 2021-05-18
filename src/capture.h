@@ -1,6 +1,6 @@
-#include <stdbool.h>   // for bool
 #include <stdio.h>     // for size_t
-#include <sys/types.h> // for ssize_t
+
+#pragma once
 
 /// Dynamically allocated buffer for reading files
 struct dynbuf
@@ -20,12 +20,6 @@ struct capture
     int signal; // signal that killed the child (if any)
 };
 
-/// Allocate new dynbuf
-static void init_dynbuf(struct dynbuf *dbuf, int bufsize);
-
-/// Read file into dynbuf
-static ssize_t read_dynbuf(int fd, struct dynbuf *dbuf);
-
 /// Free dynbuf memory as needed
 void free_capture(struct capture *result);
 
@@ -34,4 +28,3 @@ struct capture *new_capture();
 
 /// Spawn subprocess to capture command
 struct capture *capture_child(char *const argv[]);
-
