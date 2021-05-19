@@ -1,27 +1,18 @@
-#include "capture.h"
-#include "log.h"
-#include "repo.h"
-#include "util.h"             // for str_ndup, capture_child, free_capture
-#include <assert.h>           // for assert
+#include "log.h"              // for log_set_quiet, log_set_level, LOG_DEBUG
+#include "options.h"          // for options, new_options
+#include "repo.h"             // for new_git_repo, parse_porcelain, parse_r...
+#include "test.h"             // for test_parse
+#include "util.h"             // for str_ndup, str_squish
 #include <bits/getopt_core.h> // for getopt, optarg, optind
 #include <libgen.h>           // for basename
 #include <stdbool.h>          // for true, false
-#include <stdio.h>            // for fprintf, fputs, putc, puts, size_t
-#include <stdlib.h>           // for free, exit, strtol, calloc, getenv
-#include <string.h>           // for strlen, strcmp, strstr
+#include <stdio.h>            // for fprintf, NULL, fclose, fputs, open_mem...
+#include <stdlib.h>           // for exit, free, getenv, realpath, strtol
 #include <unistd.h>           // for getcwd
 
 #ifndef FMT_STRING
 #define FMT_STRING "%b@%c"
 #endif
-
-// Constants
-static const char *AHEAD_GLYPH = "↑";
-static const char *BEHIND_GLYPH = "↓";
-static const char *DIRTY_GLYPH = "*";
-static const char *UNTRACKED_GLYPH = "…";
-
-void test_parse();
 
 /// Parse cli arguments into options struct
 struct options *parse_args(int argc, char **argv)
@@ -115,93 +106,6 @@ void parse_format(struct options *opts)
             }
         }
     }
-}
-
-void parse_result(struct git_repo *repo, const char *format, FILE *stream)
-{
-    for (const char *fmt = format; *fmt; ++fmt) {
-        if (*fmt == '%') {
-            ++fmt;
-            switch (*fmt) {
-            case 'b':
-                fprintf(stream, "%s", repo->branch);
-                break;
-            case 'c':
-                fprintf(stream, "%s", repo->commit);
-                break;
-            case 'u':
-                if (repo->untracked) fputs(UNTRACKED_GLYPH, stream);
-                break;
-            case 'U':
-                if (repo->untracked) fprintf(stream, "%d", repo->untracked);
-                break;
-            case 'm':
-                if (repo->changed) fputs(DIRTY_GLYPH, stream);
-                break;
-            case 'M':
-                if (repo->changed) fprintf(stream, "%d", repo->changed);
-                break;
-            case 'a':
-                if (repo->ahead) fputs(AHEAD_GLYPH, stream);
-                break;
-            case 'A':
-                if (repo->ahead) fprintf(stream, "%d", repo->ahead);
-                break;
-            case 'z':
-                if (repo->behind) fputs(BEHIND_GLYPH, stream);
-                break;
-            case 'Z':
-                if (repo->behind) fprintf(stream, "%d", repo->behind);
-                break;
-            case '\\':
-                // escape sequence
-                if (*++fmt == 'n') putc('\n', stream);
-                break;
-            default:
-                log_error("error: invalid format string token: %%%c\n", *fmt);
-                fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
-                exit(1);
-            }
-        } else if (*fmt == '\\') {
-            if (*++fmt == 'n') {
-                putc('\n', stream);
-            } else {
-                log_warn("invalid escape sequence in format string: \\%s", fmt);
-            }
-        } else {
-            fputc(*fmt, stream);
-        }
-    }
-    fflush(stream);
-}
-
-/// Set up repo struct and test result of parse function
-void test_parse()
-{
-    struct git_repo repo = {.branch = "test",
-                            .commit = "abcd1234",
-                            .ahead = 1,
-                            .behind = 2,
-                            .changed = 0,
-                            .untracked = 100};
-    const char *format = "  %b@%c %m%M %u%U %a%A%z%Z  ";
-    const char *expected = "test@abcd1234 ?100 ↑1↓2";
-    FILE *stream;
-    char *buf;
-    size_t buflen;
-    stream = open_memstream(&buf, &buflen);
-    parse_result(&repo, format, stream);
-    fclose(stream);
-    buflen = str_squish(buf, true);
-    puts("Test results");
-    puts("------------");
-    printf("Test 1\n"
-           "    Result:    {buf=%s, len=%zu}\n"
-           "    Expected:  {buf=%s, len=%zu}\n"
-           "    Match:     %d\n",
-           buf, buflen, expected, strlen(expected), (strcmp(buf, expected) == 0));
-    assert((strcmp(buf, expected) == 0));
-    free(buf);
 }
 
 int main(int argc, char **argv)

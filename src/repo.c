@@ -7,6 +7,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+// Constants
+static const char *AHEAD_GLYPH = "↑";
+static const char *BEHIND_GLYPH = "↓";
+static const char *DIRTY_GLYPH = "*";
+static const char *UNTRACKED_GLYPH = "…";
+
 /// Completely free git_repo struct
 static void git_repo_free(struct git_repo *self)
 {
@@ -131,3 +137,62 @@ void parse_porcelain(struct git_repo *repo, struct options *opts)
     }
     output->free(output);
 }
+
+void parse_result(struct git_repo *repo, const char *format, FILE *stream)
+{
+    for (const char *fmt = format; *fmt; ++fmt) {
+        if (*fmt == '%') {
+            ++fmt;
+            switch (*fmt) {
+            case 'b':
+                fprintf(stream, "%s", repo->branch);
+                break;
+            case 'c':
+                fprintf(stream, "%s", repo->commit);
+                break;
+            case 'u':
+                if (repo->untracked) fputs(UNTRACKED_GLYPH, stream);
+                break;
+            case 'U':
+                if (repo->untracked) fprintf(stream, "%d", repo->untracked);
+                break;
+            case 'm':
+                if (repo->changed) fputs(DIRTY_GLYPH, stream);
+                break;
+            case 'M':
+                if (repo->changed) fprintf(stream, "%d", repo->changed);
+                break;
+            case 'a':
+                if (repo->ahead) fputs(AHEAD_GLYPH, stream);
+                break;
+            case 'A':
+                if (repo->ahead) fprintf(stream, "%d", repo->ahead);
+                break;
+            case 'z':
+                if (repo->behind) fputs(BEHIND_GLYPH, stream);
+                break;
+            case 'Z':
+                if (repo->behind) fprintf(stream, "%d", repo->behind);
+                break;
+            case '\\':
+                // escape sequence
+                if (*++fmt == 'n') putc('\n', stream);
+                break;
+            default:
+                log_error("error: invalid format string token: %%%c\n", *fmt);
+                fprintf(stderr, "error: invalid format string token: %%%c\n", *fmt);
+                exit(1);
+            }
+        } else if (*fmt == '\\') {
+            if (*++fmt == 'n') {
+                putc('\n', stream);
+            } else {
+                log_warn("invalid escape sequence in format string: \\%s", fmt);
+            }
+        } else {
+            fputc(*fmt, stream);
+        }
+    }
+    fflush(stream);
+}
+

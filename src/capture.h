@@ -1,6 +1,6 @@
-#include <stdio.h> // for size_t
-
 #pragma once
+
+#include <stdio.h> // for size_t
 
 /// Dynamically allocated buffer for reading files
 struct dynbuf

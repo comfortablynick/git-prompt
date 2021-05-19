@@ -1,8 +1,9 @@
-#include <stdio.h>
-#include <stdint.h>
-#include "options.h"
-
 #pragma once
+
+#include <stdint.h>  // for uint8_t
+#include <stdio.h>   // for size_t, FILE
+
+struct options;
 
 #ifndef GIT_HASH_LEN
 #define GIT_HASH_LEN 7
@@ -30,6 +31,9 @@ struct git_repo
     /// Set git_repo ahead/behind from string
     int (*set_ahead_behind)(struct git_repo *self, char *buf);
 };
+
+/// Parse git_repo according to format string
+void parse_result(struct git_repo *repo, const char *format, FILE *stream);
 
 /// Allocate new git_repo struct
 struct git_repo *new_git_repo();

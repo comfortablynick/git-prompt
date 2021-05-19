@@ -1,7 +1,7 @@
+#pragma once
+
 #include <stdbool.h>  // for bool
 #include <stdint.h>   // for uint8_t
-
-#pragma once
 
 /// Store options set from command line
 struct options

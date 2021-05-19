@@ -1,7 +1,7 @@
+#pragma once
+
 #include <stdbool.h> // for bool
 #include <stdio.h>   // for size_t
-
-#pragma once
 
 /// Alternative to strtol which allows '+' and '-' prefixes
 int strtoint_n(const char *str, int n);
