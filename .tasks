@@ -17,7 +17,7 @@ save=1
 
 [run]
 # Build, install and run
-command = xmake build && git-prompt
+command = xmake build && $(VIM_PRONAME)
 output  = terminal
 pos     = tmux
 cwd     = $(VIM_ROOT)
@@ -35,8 +35,15 @@ focus   = 0
 
 [memcheck]
 # Run valgrind memory check
-command = valgrind --leak-check=full --show-reachable=yes git-prompt
+command = valgrind --leak-check=full --show-reachable=yes $(VIM_PRONAME)
 output  = terminal
 pos     = tmux
 cwd     = $(VIM_ROOT)
 focus   = 0
+
+[test]
+command = $(VIM_PRONAME) -T
+output = terminal
+pos = tmux
+cwd = $(VIM_ROOT)
+focus = 0

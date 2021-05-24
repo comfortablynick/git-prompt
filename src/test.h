@@ -1,4 +1,4 @@
 #pragma once
 
-/// Set up repo struct and test result of parse function
-void test_parse();
+/// Run functions designed to test parsing of git repos
+void run_tests();

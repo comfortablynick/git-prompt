@@ -37,7 +37,7 @@ struct options *parse_args(int argc, char **argv)
             options->timeout = strtol(optarg, NULL, 10);
             break;
         case 'T':
-            test_parse();
+            run_tests();
             exit(EXIT_SUCCESS);
             break;
         default:
@@ -63,7 +63,6 @@ struct options *parse_args(int argc, char **argv)
                     "  dir  location of git repo (default is cwd)\n"
                     "\nEnvironment:\n"
                     "  $GITPROMPT_FORMAT  format string");
-
             fprintf(stderr, " (default=\"%s\")\n", FMT_STRING);
             free(options);
             exit(EXIT_FAILURE);
